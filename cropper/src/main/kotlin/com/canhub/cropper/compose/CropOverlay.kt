@@ -240,8 +240,8 @@ private fun DrawScope.drawCropOverlay(
             val path = Path().apply {
                 addRect(Rect(Offset.Zero, Size(containerWidth, containerHeight)))
                 addOval(Rect(
-                    center = Offset(centerX, centerY),
-                    radius = kotlin.math.max(radiusX, radiusY)
+                    offset = Offset(cropLeft, cropTop),
+                    size = Size(cropRight - cropLeft, cropBottom - cropTop)
                 ))
             }
             
