@@ -1,5 +1,6 @@
 package com.canhub.cropper.sample
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
@@ -18,6 +19,9 @@ internal class MainActivity : AppCompatActivity() {
     binding.sampleCropImageView.setOnClickListener { SampleUsingImageViewFragment().show() }
     binding.sampleCustomActivity.setOnClickListener { SampleCustomActivity.start(this) }
     binding.sampleCropImage.setOnClickListener { SampleCropFragment().show() }
+    binding.sampleComposeCropper.setOnClickListener {
+      startActivity(Intent(this, SampleComposeActivity::class.java))
+    }
 
     onBackPressedDispatcher.addCallback(
       this,

@@ -2,6 +2,7 @@ plugins {
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
   id("org.jetbrains.kotlin.plugin.parcelize")
+  id("org.jetbrains.kotlin.plugin.compose")
 }
 
 kotlin {
@@ -26,6 +27,11 @@ android {
 
   buildFeatures {
     viewBinding = true
+    compose = true
+  }
+
+  composeOptions {
+    kotlinCompilerExtensionVersion = "1.5.14"
   }
 
   compileOptions {
@@ -48,6 +54,17 @@ dependencies {
   implementation(libs.androidx.core.ktx)
   implementation(libs.material)
   implementation(libs.timber)
+
+  // Compose dependencies
+  implementation(platform(libs.compose.bom))
+  implementation(libs.compose.ui)
+  implementation(libs.compose.ui.graphics)
+  implementation(libs.compose.ui.preview)
+  implementation(libs.compose.foundation)
+  implementation(libs.compose.material3)
+  implementation(libs.androidx.activity.ktx)
+
+  debugImplementation(libs.compose.ui.tooling)
 }
 
 dependencies {

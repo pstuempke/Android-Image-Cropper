@@ -40,6 +40,7 @@
   <string name="sample_using_cropimageview">Sample using CropImageView</string>
   <string name="sample_of_customactivity">Sample of CustomActivity</string>
   <string name="sample_calling_cropimage">Sample calling CropImage</string>
+  <string name="sample_compose_cropper">Sample Compose ImageCropper</string>
   <string name="takePictureBeforeCallLibraryWithUri_text">Take camera picture before calling library with uri</string>
   <string name="callLibraryWithoutUri_text">Call library directly without uri</string>
   <string name="callLibraryWithoutUriCameraOnly_text">Call library directly without uri. Camera only</string>
