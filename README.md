@@ -57,7 +57,6 @@ fun MyCropScreen() {
 
 ### [2. Calling crop directly](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCropFragment.kt)
 
-### [2. Calling crop directly](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCropFragment.kt)
 
 **Note:** This way is deprecated and will be removed in future versions. The path forward is to write your own Activity, handle all the `Uri` stuff yourself and use `CropImageView`.
 
