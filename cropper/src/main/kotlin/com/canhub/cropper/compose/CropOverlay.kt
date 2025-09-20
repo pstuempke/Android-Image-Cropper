@@ -55,6 +55,9 @@ internal fun CropOverlay(
     containerHeight: Float,
     imageWidth: Float,
     imageHeight: Float,
+    imageScale: Float,
+    imageOffsetX: Float,
+    imageOffsetY: Float,
     aspectRatio: Float?,
     onCropChange: (Float, Float, Float, Float) -> Unit,
     onCrop: () -> Unit
@@ -87,6 +90,7 @@ internal fun CropOverlay(
                             cropLeft, cropTop, cropRight, cropBottom,
                             containerWidth, containerHeight,
                             imageWidth, imageHeight,
+                            imageScale, imageOffsetX, imageOffsetY,
                             aspectRatio
                         )
                         onCropChange(newBounds.left, newBounds.top, newBounds.right, newBounds.bottom)
@@ -319,7 +323,7 @@ private fun getHandleIndex(
 }
 
 /**
- * Calculates new crop bounds based on drag gesture
+ * Calculates new crop bounds based on drag gesture, accounting for image transformations
  */
 private fun calculateNewBounds(
     handleIndex: Int,
@@ -333,15 +337,23 @@ private fun calculateNewBounds(
     containerHeight: Float,
     imageWidth: Float,
     imageHeight: Float,
+    imageScale: Float,
+    imageOffsetX: Float,
+    imageOffsetY: Float,
     aspectRatio: Float?
 ): Rect {
-    val imageOffsetX = (containerWidth - imageWidth) / 2
-    val imageOffsetY = (containerHeight - imageHeight) / 2
+    // Calculate transformed image bounds
+    val baseImageOffsetX = (containerWidth - imageWidth) / 2
+    val baseImageOffsetY = (containerHeight - imageHeight) / 2
+    val transformedImageOffsetX = baseImageOffsetX + imageOffsetX - (imageWidth * (imageScale - 1)) / 2
+    val transformedImageOffsetY = baseImageOffsetY + imageOffsetY - (imageHeight * (imageScale - 1)) / 2
+    val transformedImageWidth = imageWidth * imageScale
+    val transformedImageHeight = imageHeight * imageScale
     
-    val minLeft = imageOffsetX
-    val minTop = imageOffsetY
-    val maxRight = imageOffsetX + imageWidth
-    val maxBottom = imageOffsetY + imageHeight
+    val minLeft = transformedImageOffsetX
+    val minTop = transformedImageOffsetY
+    val maxRight = transformedImageOffsetX + transformedImageWidth
+    val maxBottom = transformedImageOffsetY + transformedImageHeight
     
     var newLeft = cropLeft
     var newTop = cropTop

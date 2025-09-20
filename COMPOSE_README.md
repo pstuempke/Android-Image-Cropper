@@ -58,6 +58,7 @@ ImageCropper(
 - **Rectangle and oval crop shapes**: Support for different crop window shapes
 - **Aspect ratio constraints**: Optional fixed aspect ratios (1:1, 16:9, etc.)
 - **Interactive crop window**: Drag corners/edges to resize, drag center to move
+- **Image manipulation**: Pinch to zoom and drag to move the image behind the crop overlay
 - **Double-tap to crop**: Convenient gesture to perform the crop operation
 - **Composable API**: Fully integrated with Jetpack Compose
 - **Coil integration**: Uses Coil for efficient image loading
@@ -85,6 +86,8 @@ Sealed class representing the result of a crop operation:
 
 - **Resize crop window**: Drag any corner or edge of the crop window
 - **Move crop window**: Drag the center area of the crop window
+- **Scale image**: Pinch gesture on the image to zoom in/out (0.5x to 3.0x)
+- **Move image**: Drag the image to reposition it behind the crop overlay
 - **Perform crop**: Double-tap anywhere within the crop window
 - **Visual feedback**: Grid lines and semi-transparent overlay show crop area
 
