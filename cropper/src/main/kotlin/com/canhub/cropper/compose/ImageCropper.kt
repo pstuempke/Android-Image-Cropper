@@ -137,7 +137,7 @@ fun ImageCropper(
                             
                             if (aspectRatio != null) {
                                 // Calculate crop size based on aspect ratio
-                                val cropWidth = minOf(imageWidth, imageHeight / aspectRatio)
+                                val cropWidth = minOf(imageWidth, imageHeight * aspectRatio)
                                 val cropHeight = cropWidth / aspectRatio
                                 
                                 cropLeft = imageOffsetX + (imageWidth - cropWidth) / 2
