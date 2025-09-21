@@ -123,7 +123,6 @@ fun ImageCropper(
                         onGesture = { _, pan, zoom, _ ->
                             // Apply constraints to prevent image from being moved too far
                             val containerWidthPx = size.width.toFloat()
-                            val containerHeightPx = size.height.toFloat()
                             
                             // Update scale with constraints
                             val newScale = (imageScale * zoom).coerceIn(0.5f, 3.0f)
