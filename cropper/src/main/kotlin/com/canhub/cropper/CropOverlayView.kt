@@ -30,13 +30,34 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** A custom View representing the crop window and the shaded background outside the crop window. */
+/**
+ * A custom View that provides the visual crop overlay interface for image cropping.
+ * 
+ * This view is responsible for:
+ * - Drawing the crop window frame and handles
+ * - Handling touch events for moving and resizing the crop window
+ * - Providing visual feedback with guidelines and corner indicators
+ * - Managing the semi-transparent overlay outside the crop area
+ * - Ensuring crop window movements respect image and view boundaries
+ * 
+ * The view supports different crop shapes (rectangle, circle), multiple guideline options,
+ * and various visual customizations through CropImageOptions.
+ * 
+ * @param context The Android context for this view
+ * @param attrs Optional attribute set for XML-defined properties
+ */
 internal class CropOverlayView @JvmOverloads constructor(
   context: Context,
   attrs: AttributeSet? = null,
 ) : View(context, attrs) {
   internal companion object {
-    /** Creates the paint object for drawing text label over crop overlay. */
+    /** 
+     * Creates a Paint object configured for drawing text labels over the crop overlay.
+     * The paint is configured with the text size and color from the provided options.
+     * 
+     * @param options The crop image options containing text styling preferences
+     * @return A Paint object ready for drawing text labels
+     */
     internal fun getTextPaint(options: CropImageOptions): Paint =
       Paint().apply {
         strokeWidth = 1f
@@ -46,13 +67,26 @@ internal class CropOverlayView @JvmOverloads constructor(
         this.color = options.cropperLabelTextColor
       }
 
-    /** Creates the Paint object for drawing. */
+    /** 
+     * Creates a basic Paint object with the specified color.
+     * Used for simple solid color drawing operations.
+     * 
+     * @param color The color to set for this paint object
+     * @return A Paint object configured with the specified color
+     */
     internal fun getNewPaint(color: Int): Paint =
       Paint().apply {
         this.color = color
       }
 
-    /** Creates the Paint object for given thickness and color, if thickness < 0 return null. */
+    /** 
+     * Creates a Paint object for drawing strokes with specified thickness and color.
+     * Returns null if thickness is not positive, indicating no border should be drawn.
+     * 
+     * @param thickness The stroke width in pixels - if <= 0, returns null
+     * @param color The color for the stroke
+     * @return A Paint object configured for stroking, or null if thickness <= 0
+     */
     internal fun getNewPaintOrNull(thickness: Float, color: Int): Paint? =
       if (thickness > 0) {
         val borderPaint = Paint()
@@ -65,6 +99,13 @@ internal class CropOverlayView @JvmOverloads constructor(
         null
       }
 
+    /**
+     * Creates a Paint object configured for fill operations with anti-aliasing enabled.
+     * Used for drawing solid filled shapes and areas.
+     * 
+     * @param color The fill color for the paint object
+     * @return A Paint object configured for fill operations
+     */
     internal fun getNewPaintWithFill(color: Int): Paint {
       val borderPaint = Paint()
       borderPaint.color = color
@@ -74,68 +115,129 @@ internal class CropOverlayView @JvmOverloads constructor(
     }
   }
 
+  /** The radius for circular crop corner shapes when corner style is set to circle */
   private var mCropCornerRadius: Float = 0f
+  
+  /** The fill color for circular crop corners when corner style is set to circle */
   private var mCircleCornerFillColor: Int? = null
+  
+  /** The crop image options containing all visual and behavioral settings for the crop overlay */
   private var mOptions: CropImageOptions? = null
 
-  /** Gesture detector used for multitouch box scaling. */
+  /** 
+   * Gesture detector used for handling multitouch pinch-to-zoom scaling of the crop rectangle.
+   * Only active when multitouch is enabled via setMultiTouchEnabled().
+   */
   private var mScaleDetector: ScaleGestureDetector? = null
 
-  /** Boolean to see if multitouch is enabled for the crop rectangle. */
+  /** 
+   * Boolean flag controlling whether multitouch pinch-to-zoom gestures are enabled for resizing
+   * the crop rectangle. When true, users can use two fingers to scale the crop window.
+   */
   private var mMultiTouchEnabled = false
 
-  /** Boolean to see if movement via dragging center is enabled for the crop rectangle. */
+  /** 
+   * Boolean flag controlling whether the crop rectangle can be moved by dragging its center area.
+   * When true, users can touch and drag the center of the crop window to reposition it.
+   * When false, only edge and corner handles can be used for manipulation.
+   */
   private var mCenterMoveEnabled = true
 
-  /** Handler from crop window stuff, moving and knowing position. */
+  /** 
+   * Handler responsible for managing crop window state, dimensions, and position constraints.
+   * This handler maintains the crop window boundaries and provides access to size limits.
+   */
   private val mCropWindowHandler = CropWindowHandler()
 
-  /** Listener to public crop window changes. */
+  /** 
+   * Listener interface for receiving notifications when the crop window changes.
+   * Called during both interactive changes (while user is dragging) and when changes complete.
+   */
   private var mCropWindowChangeListener: CropWindowChangeListener? = null
 
-  /** Rectangle used for drawing. */
+  /** 
+   * Reusable rectangle object used for drawing operations to avoid object allocation during rendering.
+   * Updated with current crop window coordinates before each draw operation.
+   */
   private val mDrawRect = RectF()
 
-  /** The Paint used to draw the white rectangle around the crop area. */
+  /** 
+   * Paint object used for drawing the border outline around the crop area.
+   * Configured with border color and thickness from crop options.
+   */
   private var mBorderPaint: Paint? = null
 
-  /** The Paint used to draw the corners of the Border. */
+  /** 
+   * Paint object used for drawing the corner handles of the crop window border.
+   * These corners provide visual indicators for resize handles.
+   */
   private var mBorderCornerPaint: Paint? = null
 
-  /** The Paint used to draw the guidelines within the crop area when pressed. */
+  /** 
+   * Paint object used for drawing the guideline grid within the crop area.
+   * Guidelines help users compose their crop selection using rule-of-thirds or other alignment aids.
+   */
   private var mGuidelinePaint: Paint? = null
 
-  /** The Paint used to darken the surrounding areas outside the crop area. */
+  /** 
+   * Paint object used for drawing the semi-transparent overlay that darkens areas outside the crop window.
+   * This helps focus attention on the crop area by de-emphasizing the surrounding image.
+   */
   private var mBackgroundPaint: Paint? = null
 
+  /** 
+   * Paint object used for drawing text labels over the crop overlay when text labeling is enabled.
+   */
   private var textLabelPaint: Paint? = null
 
   /**
-   * Currently moving pointer used to stop movement event
-   * when initial pointer was released
-   * (to avoid crop overlay jumps)
+   * Tracks the pointer ID of the touch event that initiated the current drag operation.
+   * Used to ensure that only the original finger continues the drag operation, preventing
+   * erratic behavior when multiple fingers touch the screen during a drag.
    */
   private var currentPointerId: Int? = null
 
-  /** Used for oval crop window shape or non-straight rotation drawing. */
+  /** 
+   * Path object used for drawing complex shapes, particularly for oval/circular crop windows
+   * and for handling non-straight rotation angles where simple rectangles are insufficient.
+   */
   private val mPath = Path()
 
-  /** The bounding box around the Bitmap that we are cropping. */
+  /** 
+   * Array containing the eight coordinate values (x1,y1,x2,y2,x3,y3,x4,y4) that define
+   * the four corners of the image bounding box. Used for calculating crop boundaries
+   * especially when the image has been rotated at non-90-degree angles.
+   */
   private val mBoundsPoints = FloatArray(8)
 
-  /** The bounding box around the Bitmap that we are cropping. */
+  /** 
+   * Rectangle that represents the calculated crop boundaries after accounting for image rotation
+   * and transformation. Updated by calculateBounds() method before movement operations.
+   */
   private val mCalcBounds = RectF()
 
-  /** The bounding image view width used to know the crop overlay is at view edges. */
+  /** 
+   * The width of the containing image view in pixels. Used for boundary calculations to ensure
+   * the crop overlay doesn't extend beyond the view edges.
+   */
   private var mViewWidth = 0
 
-  /** The bounding image view height used to know the crop overlay is at view edges. */
+  /** 
+   * The height of the containing image view in pixels. Used for boundary calculations to ensure
+   * the crop overlay doesn't extend beyond the view edges.
+   */
   private var mViewHeight = 0
 
-  /** The offset to draw the border corner from the border. */
+  /** 
+   * The distance in pixels to offset corner indicators inward from the border edge.
+   * This creates visual separation between the border line and corner handles.
+   */
   private var mBorderCornerOffset = 0f
 
-  /** The length of the border corner to draw. */
+  /** 
+   * The length in pixels of each corner handle indicator line.
+   * Corner handles typically consist of two perpendicular lines forming an L-shape.
+   */
   private var mBorderCornerLength = 0f
 
   /** The initial crop window padding from image borders. */
@@ -1096,6 +1198,18 @@ internal class CropOverlayView @JvmOverloads constructor(
     )
   }
 
+  /**
+   * Handles all touch events for the crop overlay, coordinating between single-touch crop
+   * manipulation and optional multi-touch scaling operations.
+   * 
+   * The method processes three main types of touch events:
+   * - ACTION_DOWN: Determines what part of the crop window was touched and initializes movement
+   * - ACTION_MOVE: Updates crop window position/size based on finger movement
+   * - ACTION_UP/CANCEL: Completes the operation and notifies listeners
+   * 
+   * @param event The motion event containing touch coordinates and action type
+   * @return True if the event was handled, false otherwise
+   */
   @SuppressLint("ClickableViewAccessibility")
   override fun onTouchEvent(event: MotionEvent): Boolean {
     // If this View is not enabled, don't allow for touch interactions.
@@ -1132,8 +1246,19 @@ internal class CropOverlayView @JvmOverloads constructor(
   }
 
   /**
-   * On press down start crop window movement depending on the location of the press.<br></br>
-   * if press is far from crop window then no move handler is returned (null).
+   * Initiates crop window movement by determining which part of the crop window was touched.
+   * 
+   * Based on the touch coordinates, this method identifies whether the user touched:
+   * - A corner handle (for resizing)
+   * - An edge handle (for resizing along one axis)  
+   * - The center area (for repositioning)
+   * - Outside the crop window (no action)
+   * 
+   * If a valid area is touched, a corresponding move handler is created and the view
+   * is invalidated to show visual feedback.
+   * 
+   * @param x The x-coordinate of the touch event
+   * @param y The y-coordinate of the touch event
    */
   private fun onActionDown(x: Float, y: Float) {
     mMoveHandler =
@@ -1142,7 +1267,11 @@ internal class CropOverlayView @JvmOverloads constructor(
     if (mMoveHandler != null) invalidate()
   }
 
-  /** Clear move handler starting in [onActionDown] if exists. */
+  /** 
+   * Completes the current crop window operation and cleans up the move handler.
+   * Called when the user lifts their finger or the touch event is cancelled.
+   * Notifies listeners that the crop window change operation has completed.
+   */
   private fun onActionUp() {
     if (mMoveHandler != null) {
       mMoveHandler = null

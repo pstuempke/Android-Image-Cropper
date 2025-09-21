@@ -5,54 +5,106 @@ import android.graphics.RectF
 import kotlin.math.max
 import kotlin.math.min
 
-/** Handler to update crop window edges by the move type - Horizontal, Vertical, Corner or Center. */
+/**
+ * Handler responsible for updating crop window edges based on user touch interactions.
+ * This class manages different types of crop window movements including:
+ * - Edge movements (horizontal/vertical)
+ * - Corner movements (diagonal resizing)
+ * - Center movements (position changes without resizing)
+ * 
+ * The handler ensures that all movements respect the image boundaries, view boundaries,
+ * minimum/maximum size constraints, and aspect ratio requirements when applicable.
+ * 
+ * @param type The specific type of movement this handler will execute
+ * @param cropWindowHandler The main handler that manages crop window state and boundaries
+ * @param touchX The initial horizontal touch position used to calculate movement deltas
+ * @param touchY The initial vertical touch position used to calculate movement deltas
+ */
 internal class CropWindowMoveHandler(
-  /** The type of move this handler is executing */
+  /** The type of move operation this handler is responsible for executing */
   private val type: Type,
-  /** Main crop window handle to get and update the crop window edges */
+  /** Main crop window handler that provides access to crop window state and constraints */
   cropWindowHandler: CropWindowHandler,
-  /** The location of the initial touch position to measure move distance */
+  /** The initial x-coordinate of the touch event that started this movement operation */
   touchX: Float,
-  /** The location of the initial touch position to measure move distance */
+  /** The initial y-coordinate of the touch event that started this movement operation */
   touchY: Float,
 ) {
 
-  /** The type of crop window move that is handled. */
+  /**
+   * Enumeration of all possible crop window movement types.
+   * Each type defines how the crop window should respond to touch movements.
+   */
   internal enum class Type {
+    /** Movement of the top-left corner handle - affects both top and left edges */
     TOP_LEFT,
+    /** Movement of the top-right corner handle - affects both top and right edges */
     TOP_RIGHT,
+    /** Movement of the bottom-left corner handle - affects both bottom and left edges */
     BOTTOM_LEFT,
+    /** Movement of the bottom-right corner handle - affects both bottom and right edges */
     BOTTOM_RIGHT,
+    /** Movement of the left edge handle - affects only the left edge */
     LEFT,
+    /** Movement of the top edge handle - affects only the top edge */
     TOP,
+    /** Movement of the right edge handle - affects only the right edge */
     RIGHT,
+    /** Movement of the bottom edge handle - affects only the bottom edge */
     BOTTOM,
+    /** Movement of the center area - translates the entire crop window without resizing */
     CENTER,
   }
 
   internal companion object {
-    /** Calculates the aspect ratio given a rectangle. */
+    /** 
+     * Calculates the aspect ratio of a rectangle given its coordinates.
+     * The aspect ratio is defined as width divided by height.
+     * 
+     * @param left The left coordinate of the rectangle
+     * @param top The top coordinate of the rectangle  
+     * @param right The right coordinate of the rectangle
+     * @param bottom The bottom coordinate of the rectangle
+     * @return The aspect ratio (width/height) of the rectangle
+     */
     internal fun calculateAspectRatio(left: Float, top: Float, right: Float, bottom: Float) =
       (right - left) / (bottom - top)
   }
 
-  /** Minimum width in pixels that the crop window can get. */
+  /** 
+   * The minimum width in pixels that the crop window is allowed to shrink to.
+   * This constraint prevents the crop window from becoming too small to be usable.
+   */
   private val mMinCropWidth: Float = cropWindowHandler.getMinCropWidth()
 
-  /** Minimum width in pixels that the crop window can get. */
+  /** 
+   * The minimum height in pixels that the crop window is allowed to shrink to.
+   * This constraint prevents the crop window from becoming too small to be usable.
+   */
   private val mMinCropHeight: Float = cropWindowHandler.getMinCropHeight()
 
-  /** Maximum height in pixels that the crop window can get. */
+  /** 
+   * The maximum width in pixels that the crop window is allowed to expand to.
+   * This constraint prevents the crop window from exceeding the available space.
+   */
   private val mMaxCropWidth: Float = cropWindowHandler.getMaxCropWidth()
 
-  /** Maximum height in pixels that the crop window can get. */
+  /** 
+   * The maximum height in pixels that the crop window is allowed to expand to.
+   * This constraint prevents the crop window from exceeding the available space.
+   */
   private val mMaxCropHeight: Float = cropWindowHandler.getMaxCropHeight()
 
   /**
-   * Holds the x and y offset between the exact touch location and the exact handle location that is
-   * activated. There may be an offset because we allow for some leeway (specified by mHandleRadius)
-   * in activating a handle. However, we want to maintain these offset values while the handle is
-   * being dragged so that the handle doesn't jump.
+   * Stores the offset between the exact touch location and the exact handle location.
+   * 
+   * When a user touches near a handle, there may be a small distance between the touch point
+   * and the actual handle center. This offset is calculated and stored to ensure that when
+   * the user drags the handle, it doesn't suddenly "jump" to align with the touch point.
+   * Instead, the relative position is maintained throughout the drag operation.
+   * 
+   * The offset is calculated once when the touch begins and is used to adjust all subsequent
+   * touch coordinates during the drag operation.
    */
   private val mTouchOffset = PointF(0f, 0f)
 
@@ -61,24 +113,28 @@ internal class CropWindowMoveHandler(
   }
 
   /**
-   * Updates the crop window by change in the touch location.<br></br>
-   * Move type handled by this instance, as initialized in creation, affects how the change in touch
-   * location changes the crop window position and size.<br></br>
-   * After the crop window position/size is changed by touch move it may result in values that
-   * violate constraints: outside the bounds of the shown bitmap, smaller/larger than min/max size or
-   * mismatch in aspect ratio. So a series of fixes is executed on "secondary" edges to adjust it
-   * by the "primary" edge movement.<br></br>
-   * Primary is the edge directly affected by move type, secondary is the other edge.<br></br>
-   * The crop window is changed by directly setting the Edge coordinates.
-   *
-   * [x] the new x-coordinate of this handle
-   * [y] the new y-coordinate of this handle
-   * [bounds] the bounding rectangle of the image
-   * [viewWidth] The bounding image view width used to know the crop overlay is at view edges.
-   * [viewHeight] The bounding image view height used to know the crop overlay is at view edges.
-   * [snapMargin] the maximum distance (in pixels) at which the crop window should snap to the image
-   * [fixedAspectRatio] is the aspect ratio fixed and 'targetAspectRatio' should be used
-   * [aspectRatio] the aspect ratio to maintain
+   * Primary method that handles all crop window movements and resizing operations.
+   * 
+   * This method processes touch movements and updates the crop window accordingly based on the
+   * movement type (center, edge, or corner). It ensures that all changes respect various constraints:
+   * - Image boundaries (crop window cannot extend beyond the image)
+   * - View boundaries (crop window cannot extend beyond the view area)  
+   * - Size constraints (minimum and maximum width/height limits)
+   * - Aspect ratio constraints (when fixed aspect ratio is enabled)
+   * 
+   * The method works in two phases:
+   * 1. Apply the primary movement based on the movement type
+   * 2. Adjust secondary edges to maintain constraints and aspect ratios
+   * 
+   * @param rect The current crop window rectangle that will be modified
+   * @param x The new x-coordinate of the touch position
+   * @param y The new y-coordinate of the touch position  
+   * @param bounds The bounding rectangle of the image being cropped
+   * @param viewWidth The width of the view containing the crop overlay
+   * @param viewHeight The height of the view containing the crop overlay
+   * @param snapMargin The distance in pixels within which edges will snap to boundaries
+   * @param fixedAspectRatio Whether the crop window must maintain a fixed aspect ratio
+   * @param aspectRatio The target aspect ratio to maintain (width/height) when fixedAspectRatio is true
    */
   fun move(
     rect: RectF,
@@ -183,7 +239,11 @@ internal class CropWindowMoveHandler(
     mTouchOffset.y = touchOffsetY
   }
 
-  /** Center move only changes the position of the crop window without changing the size. */
+  /** 
+   * Center move only changes the position of the crop window without changing the size.
+   * This method ensures that the crop window cannot be moved completely outside the overlay bounds.
+   * The left edge cannot move more to the right than the overlay's left edge, same for right, top, and bottom.
+   */
   private fun moveCenter(
     rect: RectF,
     x: Float,
@@ -193,18 +253,46 @@ internal class CropWindowMoveHandler(
     viewHeight: Int,
     snapRadius: Float,
   ) {
+    // Calculate the desired movement delta from current center to new position
     var dx = x - rect.centerX()
     var dy = y - rect.centerY()
-    if (rect.left + dx < 0 || rect.right + dx > viewWidth || rect.left + dx < bounds.left || rect.right + dx > bounds.right) {
-      dx /= 1.05f
-      mTouchOffset.x -= dx / 2
-    }
-
-    if (rect.top + dy < 0 || rect.bottom + dy > viewHeight || rect.top + dy < bounds.top || rect.bottom + dy > bounds.bottom) {
-      dy /= 1.05f
-      mTouchOffset.y -= dy / 2
-    }
+    
+    // Calculate the crop window width and height for boundary calculations
+    val cropWidth = rect.width()
+    val cropHeight = rect.height()
+    
+    // Constrain horizontal movement to prevent crop window from moving outside bounds
+    // Left edge constraint: rect.left + dx >= bounds.left
+    // Right edge constraint: rect.right + dx <= bounds.right
+    val minDx = bounds.left - rect.left  // Minimum dx to keep left edge within bounds
+    val maxDx = bounds.right - rect.right  // Maximum dx to keep right edge within bounds
+    
+    // Also constrain to view boundaries (0 to viewWidth)
+    val minViewDx = 0f - rect.left  // Minimum dx to keep left edge within view
+    val maxViewDx = viewWidth.toFloat() - rect.right  // Maximum dx to keep right edge within view
+    
+    // Apply the most restrictive constraints
+    dx = max(dx, max(minDx, minViewDx))  // Prevent moving too far left
+    dx = min(dx, min(maxDx, maxViewDx))  // Prevent moving too far right
+    
+    // Constrain vertical movement to prevent crop window from moving outside bounds
+    // Top edge constraint: rect.top + dy >= bounds.top
+    // Bottom edge constraint: rect.bottom + dy <= bounds.bottom
+    val minDy = bounds.top - rect.top  // Minimum dy to keep top edge within bounds
+    val maxDy = bounds.bottom - rect.bottom  // Maximum dy to keep bottom edge within bounds
+    
+    // Also constrain to view boundaries (0 to viewHeight)
+    val minViewDy = 0f - rect.top  // Minimum dy to keep top edge within view
+    val maxViewDy = viewHeight.toFloat() - rect.bottom  // Maximum dy to keep bottom edge within view
+    
+    // Apply the most restrictive constraints
+    dy = max(dy, max(minDy, minViewDy))  // Prevent moving too far up
+    dy = min(dy, min(maxDy, maxViewDy))  // Prevent moving too far down
+    
+    // Apply the constrained movement to the crop window rectangle
     rect.offset(dx, dy)
+    
+    // Snap edges to bounds if they're close enough (within snapRadius)
     snapEdgesToBounds(edges = rect, bounds = bounds, margin = snapRadius)
   }
 

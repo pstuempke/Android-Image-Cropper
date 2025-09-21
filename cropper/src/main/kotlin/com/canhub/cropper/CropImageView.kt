@@ -35,48 +35,109 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-/** Custom view that provides cropping capabilities to an image. */
+/**
+ * A comprehensive custom view that provides complete image cropping functionality.
+ * 
+ * This view combines an ImageView for displaying the source image with a CropOverlayView
+ * for the interactive cropping interface. It supports:
+ * 
+ * - Loading images from various sources (URI, resource, bitmap)
+ * - Interactive crop window manipulation (move, resize, rotate)
+ * - Image transformations (rotation, flipping, zooming)
+ * - Multiple crop shapes (rectangle, circle/oval)
+ * - Aspect ratio constraints
+ * - Asynchronous image loading and cropping operations
+ * - Customizable UI appearance and behavior
+ * 
+ * The view handles all the complex matrix transformations needed for proper image
+ * scaling, rotation, and crop window positioning while maintaining image quality
+ * and user experience.
+ * 
+ * @param context The Android context for this view
+ * @param attrs Optional attribute set for XML-defined properties
+ */
 class CropImageView @JvmOverloads constructor(
   context: Context,
   attrs: AttributeSet? = null,
 ) : FrameLayout(context, attrs),
   CropWindowChangeListener {
 
-  /** Image view widget used to show the image for cropping. */
+  /** 
+   * The underlying ImageView that displays the source image being cropped.
+   * This view handles the actual image rendering and transformations.
+   */
   private val imageView: ImageView
 
-  /** Overlay over the image view to show cropping UI. */
+  /** 
+   * The overlay view that provides the cropping interface on top of the image.
+   * Handles crop window drawing, user interactions, and visual feedback.
+   */
   private val mCropOverlayView: CropOverlayView?
 
-  /** The matrix used to transform the cropping image in the image view  */
+  /** 
+   * Matrix used for all image transformations including scaling, rotation, and translation.
+   * This matrix is applied to the ImageView to position and size the image correctly.
+   */
   private val mImageMatrix = Matrix()
 
-  /** Reusing matrix instance for reverse matrix calculations. */
+  /** 
+   * Inverse of the image transformation matrix, used for converting between
+   * screen coordinates and image coordinates during crop calculations.
+   */
   private val mImageInverseMatrix = Matrix()
 
-  /** Progress bar widget to show progress bar on async image loading and cropping. */
+  /** 
+   * Progress bar widget displayed during asynchronous image loading and cropping operations.
+   * Provides visual feedback to users during potentially long-running operations.
+   */
   private val mProgressBar: ProgressBar
 
-  /** Rectangle used in image matrix transformation calculation (reusing rect instance)  */
+  /** 
+   * Array storing the transformed coordinates of the image corners after matrix transformation.
+   * Used for calculating image bounds and positioning. Updated by mapImagePointsByImageMatrix().
+   */
   private val mImagePoints = FloatArray(8)
 
-  /** Rectangle used in image matrix transformation for scale calculation (reusing rect instance)  */
+  /** 
+   * Array used specifically for scale calculations during matrix transformations.
+   * Provides a separate working space to avoid interfering with the main mImagePoints array.
+   */
   private val mScaleImagePoints = FloatArray(8)
 
-  /** Animation class to smooth animate zoom-in/out  */
+  /** 
+   * Animation controller for smooth zoom transitions when the crop window changes.
+   * Provides smooth visual transitions instead of abrupt image jumps.
+   */
   private var mAnimation: CropImageAnimation? = null
+  
+  /** 
+   * The original unmodified bitmap loaded from the source.
+   * Maintained separately to preserve image quality during transformations.
+   */
   private var originalBitmap: Bitmap? = null
 
-  /** The image rotation value used during loading of the image, so we can reset to it  */
+  /** 
+   * The initial rotation value applied when the image was first loaded.
+   * Used as a reference point for reset operations and relative rotations.
+   */
   private var mInitialDegreesRotated = 0
 
-  /** How much the image is rotated from original clockwise  */
+  /** 
+   * Current total rotation applied to the image in degrees (clockwise).
+   * Accumulated from all rotation operations since loading.
+   */
   private var mDegreesRotated = 0
 
-  /** If the image flipped horizontally  */
+  /** 
+   * Flag indicating whether the image has been flipped horizontally.
+   * Applied in addition to any rotation transformations.
+   */
   private var mFlipHorizontally: Boolean
 
-  /** If the image flipped vertically  */
+  /** 
+   * Flag indicating whether the image has been flipped vertically.
+   * Applied in addition to any rotation transformations.
+   */
   private var mFlipVertically: Boolean
   private var mLayoutWidth = 0
   private var mLayoutHeight = 0
