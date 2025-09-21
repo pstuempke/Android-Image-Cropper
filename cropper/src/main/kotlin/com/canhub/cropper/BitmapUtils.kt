@@ -934,6 +934,26 @@ internal object BitmapUtils {
       }
     }
 
+  /**
+   * Converts a Drawable to a Bitmap
+   */
+  fun getBitmap(drawable: android.graphics.drawable.Drawable): Bitmap? {
+    return when (drawable) {
+      is android.graphics.drawable.BitmapDrawable -> drawable.bitmap
+      else -> {
+        val bitmap = Bitmap.createBitmap(
+          drawable.intrinsicWidth,
+          drawable.intrinsicHeight,
+          Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        bitmap
+      }
+    }
+  }
+
   internal class BitmapSampled(
     val bitmap: Bitmap?,
     val sampleSize: Int,

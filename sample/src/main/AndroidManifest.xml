@@ -22,5 +22,10 @@
     <activity
         android:name="com.canhub.cropper.sample.SampleCustomActivity"
         android:theme="@style/Theme.SampleNoActionBar"/>
+    <activity
+        android:name="com.canhub.cropper.sample.SampleComposeActivity"
+        android:exported="true"
+        android:label="Compose Image Cropper"
+        android:theme="@style/Theme.Sample"/>
   </application>
 </manifest>

@@ -6,6 +6,7 @@ plugins {
   id("com.vanniktech.maven.publish")
   id("app.cash.licensee")
   id("app.cash.paparazzi")
+  id("org.jetbrains.kotlin.plugin.compose")
 }
 
 licensee {
@@ -29,6 +30,11 @@ android {
 
   buildFeatures {
     viewBinding = true
+    compose = true
+  }
+
+  composeOptions {
+    kotlinCompilerExtensionVersion = "1.5.14"
   }
 
   compileOptions {
@@ -48,6 +54,17 @@ dependencies {
   implementation(libs.androidx.exifinterface)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
+
+  // Compose dependencies
+  implementation(platform(libs.compose.bom))
+  implementation(libs.compose.ui)
+  implementation(libs.compose.ui.graphics)
+  implementation(libs.compose.ui.preview)
+  implementation(libs.compose.foundation)
+  implementation(libs.compose.material3)
+  implementation(libs.coil.compose)
+
+  debugImplementation(libs.compose.ui.tooling)
 }
 
 dependencies {
@@ -56,6 +73,7 @@ dependencies {
   testImplementation(libs.junit)
   testImplementation(libs.mock)
   testImplementation(libs.robolectric)
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 }
 
 // Workaround https://github.com/cashapp/paparazzi/issues/1231

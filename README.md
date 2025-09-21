@@ -20,9 +20,43 @@ dependencies {
 
 ## Using the Library
 
-There are 3 ways of using the library. Check out the sample app for all details.
+There are 4 ways of using the library. Check out the sample app for all details.
 
-### [1. Calling crop directly](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCropFragment.kt)
+### [1. Using Compose ImageCropper](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleComposeActivity.kt)
+
+**New!** Modern Jetpack Compose version with full cropping functionality.
+
+```kotlin
+@Composable
+fun MyCropScreen() {
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var cropResult by remember { mutableStateOf<CropResult?>(null) }
+    
+    selectedImageUri?.let { uri ->
+        ImageCropper(
+            imageUri = uri,
+            modifier = Modifier.fillMaxSize(),
+            cropShape = CropImageView.CropShape.RECTANGLE, // or OVAL
+            aspectRatio = 1f, // Optional fixed aspect ratio
+            onCropComplete = { result ->
+                when (result) {
+                    is CropResult.Success -> {
+                        // Handle successful crop
+                        val croppedBitmap = result.bitmap
+                    }
+                    is CropResult.Error -> {
+                        // Handle error
+                        val exception = result.exception
+                    }
+                }
+            }
+        )
+    }
+}
+```
+
+### [2. Calling crop directly](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCropFragment.kt)
+
 
 **Note:** This way is deprecated and will be removed in future versions. The path forward is to write your own Activity, handle all the `Uri` stuff yourself and use `CropImageView`.
 
@@ -77,7 +111,7 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
-### [2. Using CropView](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleUsingImageViewFragment.kt)
+### [3. Using CropView](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleUsingImageViewFragment.kt)
 
 **Note:** This is the only way forward, add `CropImageView` into your own activity and do whatever you wish. Checkout the sample for more details.
 
@@ -108,7 +142,7 @@ cropImageView.getCroppedImageAsync()
 val cropped: Bitmap = cropImageView.getCroppedImage()
 ```
 
-### [3. Extend to make a custom activity](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCustomActivity.kt)
+### [4. Extend to make a custom activity](./sample/src/main/kotlin/com/canhub/cropper/sample/SampleCustomActivity.kt)
 
 **Note:** This way is also deprecated and will be removed in future versions. The path forward is to write your own Activity, handle all the `Uri` stuff yourself and use `CropImageView`.
 
