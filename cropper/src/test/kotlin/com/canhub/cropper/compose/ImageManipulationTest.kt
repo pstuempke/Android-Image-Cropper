@@ -1,6 +1,5 @@
 package com.canhub.cropper.compose
 
-import android.graphics.Bitmap
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
