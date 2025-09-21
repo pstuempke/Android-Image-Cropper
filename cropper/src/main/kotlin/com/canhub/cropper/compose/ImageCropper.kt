@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -77,6 +79,11 @@ fun ImageCropper(
     var imageWidth by remember { mutableFloatStateOf(0f) }
     var imageHeight by remember { mutableFloatStateOf(0f) }
     
+    // Image transformation state
+    var imageScale by remember { mutableFloatStateOf(1f) }
+    var imageOffsetX by remember { mutableFloatStateOf(0f) }
+    var imageOffsetY by remember { mutableFloatStateOf(0f) }
+    
     // Crop window state
     var cropLeft by remember { mutableFloatStateOf(0f) }
     var cropTop by remember { mutableFloatStateOf(0f) }
@@ -99,11 +106,37 @@ fun ImageCropper(
         val containerWidth = maxWidth
         val containerHeight = maxHeight
         
-        // Image display
+        // Image display with transformations
         AsyncImage(
             model = imageUri,
             contentDescription = "Image to crop",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer(
+                    scaleX = imageScale,
+                    scaleY = imageScale,
+                    translationX = imageOffsetX,
+                    translationY = imageOffsetY
+                )
+                .pointerInput(Unit) {
+                    detectTransformGestures(
+                        onGesture = { _, pan, zoom, _ ->
+                            // Apply constraints to prevent image from being moved too far
+                            val containerWidthPx = size.width.toFloat()
+                            
+                            // Update scale with constraints
+                            val newScale = (imageScale * zoom).coerceIn(0.5f, 3.0f)
+                            imageScale = newScale
+                            
+                            // Update translation with constraints
+                            val maxTranslationX = (imageWidth * (newScale - 1)) / 2
+                            val maxTranslationY = (imageHeight * (newScale - 1)) / 2
+                            
+                            imageOffsetX = (imageOffsetX + pan.x).coerceIn(-maxTranslationX, maxTranslationX)
+                            imageOffsetY = (imageOffsetY + pan.y).coerceIn(-maxTranslationY, maxTranslationY)
+                        }
+                    )
+                },
             contentScale = ContentScale.Fit,
             onState = { state ->
                 when (state) {
@@ -132,23 +165,23 @@ fun ImageCropper(
                         
                         // Set initial crop window to cover the entire image if not set
                         if (cropLeft == 0f && cropTop == 0f && cropRight == 0f && cropBottom == 0f) {
-                            val imageOffsetX = (containerWidthPx - imageWidth) / 2
-                            val imageOffsetY = (containerHeightPx - imageHeight) / 2
+                            val baseImageOffsetX = (containerWidthPx - imageWidth) / 2
+                            val baseImageOffsetY = (containerHeightPx - imageHeight) / 2
                             
                             if (aspectRatio != null) {
                                 // Calculate crop size based on aspect ratio
                                 val cropWidth = minOf(imageWidth, imageHeight * aspectRatio)
                                 val cropHeight = cropWidth / aspectRatio
                                 
-                                cropLeft = imageOffsetX + (imageWidth - cropWidth) / 2
-                                cropTop = imageOffsetY + (imageHeight - cropHeight) / 2
+                                cropLeft = baseImageOffsetX + (imageWidth - cropWidth) / 2
+                                cropTop = baseImageOffsetY + (imageHeight - cropHeight) / 2
                                 cropRight = cropLeft + cropWidth
                                 cropBottom = cropTop + cropHeight
                             } else {
-                                cropLeft = imageOffsetX
-                                cropTop = imageOffsetY
-                                cropRight = imageOffsetX + imageWidth
-                                cropBottom = imageOffsetY + imageHeight
+                                cropLeft = baseImageOffsetX
+                                cropTop = baseImageOffsetY
+                                cropRight = baseImageOffsetX + imageWidth
+                                cropBottom = baseImageOffsetY + imageHeight
                             }
                         }
                         
@@ -182,6 +215,9 @@ fun ImageCropper(
                 containerHeight = with(density) { containerHeight.toPx() },
                 imageWidth = imageWidth,
                 imageHeight = imageHeight,
+                imageScale = imageScale,
+                imageOffsetX = imageOffsetX,
+                imageOffsetY = imageOffsetY,
                 aspectRatio = aspectRatio,
                 onCropChange = { left, top, right, bottom ->
                     cropLeft = left
@@ -200,6 +236,9 @@ fun ImageCropper(
                                 cropBottom = cropBottom,
                                 imageWidth = imageWidth,
                                 imageHeight = imageHeight,
+                                imageScale = imageScale,
+                                imageOffsetX = imageOffsetX,
+                                imageOffsetY = imageOffsetY,
                                 containerWidth = with(density) { containerWidth.toPx() },
                                 containerHeight = with(density) { containerHeight.toPx() }
                             )
@@ -213,7 +252,7 @@ fun ImageCropper(
 }
 
 /**
- * Crops the bitmap based on the crop window coordinates
+ * Crops the bitmap based on the crop window coordinates and image transformations
  */
 private suspend fun cropBitmap(
     bitmap: Bitmap,
@@ -223,19 +262,28 @@ private suspend fun cropBitmap(
     cropBottom: Float,
     imageWidth: Float,
     imageHeight: Float,
+    imageScale: Float,
+    imageOffsetX: Float,
+    imageOffsetY: Float,
     containerWidth: Float,
     containerHeight: Float
 ): CropResult = withContext(Dispatchers.Default) {
     try {
-        // Calculate the image offset within the container
-        val imageOffsetX = (containerWidth - imageWidth) / 2
-        val imageOffsetY = (containerHeight - imageHeight) / 2
+        // Calculate the base image offset within the container (before transformations)
+        val baseImageOffsetX = (containerWidth - imageWidth) / 2
+        val baseImageOffsetY = (containerHeight - imageHeight) / 2
         
-        // Convert crop coordinates to image coordinates
-        val cropImageLeft = ((cropLeft - imageOffsetX) / imageWidth * bitmap.width).coerceIn(0f, bitmap.width.toFloat())
-        val cropImageTop = ((cropTop - imageOffsetY) / imageHeight * bitmap.height).coerceIn(0f, bitmap.height.toFloat())
-        val cropImageRight = ((cropRight - imageOffsetX) / imageWidth * bitmap.width).coerceIn(0f, bitmap.width.toFloat())
-        val cropImageBottom = ((cropBottom - imageOffsetY) / imageHeight * bitmap.height).coerceIn(0f, bitmap.height.toFloat())
+        // Account for image transformations
+        val transformedImageOffsetX = baseImageOffsetX + imageOffsetX - (imageWidth * (imageScale - 1)) / 2
+        val transformedImageOffsetY = baseImageOffsetY + imageOffsetY - (imageHeight * (imageScale - 1)) / 2
+        val transformedImageWidth = imageWidth * imageScale
+        val transformedImageHeight = imageHeight * imageScale
+        
+        // Convert crop coordinates to original bitmap coordinates
+        val cropImageLeft = ((cropLeft - transformedImageOffsetX) / transformedImageWidth * bitmap.width).coerceIn(0f, bitmap.width.toFloat())
+        val cropImageTop = ((cropTop - transformedImageOffsetY) / transformedImageHeight * bitmap.height).coerceIn(0f, bitmap.height.toFloat())
+        val cropImageRight = ((cropRight - transformedImageOffsetX) / transformedImageWidth * bitmap.width).coerceIn(0f, bitmap.width.toFloat())
+        val cropImageBottom = ((cropBottom - transformedImageOffsetY) / transformedImageHeight * bitmap.height).coerceIn(0f, bitmap.height.toFloat())
         
         val cropWidth = (cropImageRight - cropImageLeft).roundToInt()
         val cropHeight = (cropImageBottom - cropImageTop).roundToInt()

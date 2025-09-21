@@ -201,7 +201,7 @@ fun ImageCropperSample() {
         
         // Instructions
         Text(
-            text = "Instructions:\n• Double-tap crop window to crop\n• Drag corners/edges to resize\n• Drag center to move",
+            text = "Instructions:\n• Double-tap crop window to crop\n• Drag corners/edges to resize crop window\n• Drag center to move crop window\n• Pinch to zoom image\n• Drag image to move it",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
